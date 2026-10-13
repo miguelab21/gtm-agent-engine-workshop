@@ -38,9 +38,7 @@ MODEL_NAME = "gpt-4o-mini"
 # ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
-@tool
-def lookup_offering(offering_id: str) -> dict:
-    "Look up an offering by offering_id (e.g. 'OFFER-10001'). Returns the offering and a found flag."
+def _lookup_offering(offering_id: str) -> dict:
     record = data_service.get_offering(offering_id)
     if record is None:
         return {"offering": None, "found": False}
@@ -48,8 +46,12 @@ def lookup_offering(offering_id: str) -> dict:
 
 
 @tool
-def build_prospect_profile(prospect_id: str) -> dict:
-    "Assemble a full prospect profile (engagement history, account details, tech stack) and store it. Returns the profile and a found flag."
+def lookup_offering(offering_id: str) -> dict:
+    "Look up an offering by offering_id (e.g. 'OFFER-10001'). Returns the offering and a found flag."
+    return _lookup_offering(offering_id)
+
+
+def _build_prospect_profile(prospect_id: str) -> dict:
     existing = data_service.get_profile_from_db(prospect_id)["prospect_profile"]
     if existing is not None:
         return {"prospect_profile": existing, "found": True}
@@ -65,6 +67,12 @@ def build_prospect_profile(prospect_id: str) -> dict:
     }
     data_service.save_profile_to_db(prospect_id, built)
     return {"prospect_profile": built, "found": True}
+
+
+@tool
+def build_prospect_profile(prospect_id: str) -> dict:
+    "Assemble a full prospect profile (engagement history, account details, tech stack) and store it. Returns the profile and a found flag."
+    return _build_prospect_profile(prospect_id)
 
 
 SCORING_PROMPT = (
@@ -103,14 +111,20 @@ def _offering_has_required_fields(offering):
 
 
 @tool
-def score_prospect(prospect_profile: dict, offering: dict | None = None) -> dict:
-    "Score a prospect profile's potential for an offering on a 1-100 scale with a justification. Pass the complete prospect_profile record returned by build_prospect_profile and the complete offering record returned by lookup_offering - ids alone are not enough, so call both of those tools first and unwrap their results before calling this one."
+def score_prospect(prospect_id: str, offering_id: str) -> dict:
+    "Score a prospect against an offering using their IDs; this tool loads the offering and prospect profile itself."
+    offering = _lookup_offering(offering_id)["offering"]
     if offering is None or not _offering_has_required_fields(offering):
         return {"score": None, "error": "Cannot score without a valid offering."}
+    prospect_profile = _build_prospect_profile(prospect_id)["prospect_profile"]
+    if prospect_profile is None:
+        return {"score": None, "error": "Cannot score without a valid prospect profile."}
     # Score against the prospect's saved tech stack of record.
-    pid = prospect_profile.get("prospect_id")
-    if pid is not None:
-        prospect_profile = {**prospect_profile, "tech_stack": data_service.fetch_tech_stack(pid)}
+    prospect_profile = {
+        key: value for key, value in prospect_profile.items()
+        if key != "billing_qualification"
+    }
+    prospect_profile["tech_stack"] = data_service.fetch_tech_stack(prospect_id)
     user = (
         "Offering:\n" + json.dumps(offering, indent=2) +
         "\n\nProspect profile:\n" + json.dumps(prospect_profile, indent=2)
