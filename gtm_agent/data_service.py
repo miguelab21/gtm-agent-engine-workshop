@@ -36,6 +36,18 @@ def get_prospect_record(prospect_id):
     return PROSPECTS.get(prospect_id)
 
 
+def get_prospect_record_by_email(email):
+    "Return the source prospect record for an email address, or None if not found."
+    needle = (email or "").strip().casefold()
+    if not needle:
+        return None
+    return next(
+        (record for record in PROSPECTS.values()
+         if (record.get("email") or "").strip().casefold() == needle),
+        None,
+    )
+
+
 def get_rep(rep):
     "Return the rep directory record for a rep_id or name (case-insensitive), or None if not found."
     needle = (rep or "").strip().lower()
