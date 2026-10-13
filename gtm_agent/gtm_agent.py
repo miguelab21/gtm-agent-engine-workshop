@@ -1,9 +1,9 @@
 """GTM assistant agent.
 
 A deep agent (built with ``deepagents.create_deep_agent``) with
-seven tools - lookup_offering, build_prospect_profile, get_prospect,
-get_current_rep, send_prospect_email, score_prospect, and
-update_prospect_info. The tools call the data-access layer in ``data_service`` for
+six tools - lookup_offering, build_prospect_profile, get_prospect,
+send_prospect_email, score_prospect, and update_prospect_info. The tools call
+the data-access layer in ``data_service`` for
 storage and retrieval.
 
 Configure credentials via environment variables or a .env file
@@ -153,16 +153,6 @@ def get_prospect(prospect_id: str) -> dict:
 
 
 @tool
-def get_current_rep(runtime: ToolRuntime) -> dict:
-    "Look up the rep making this request (the signed-in sender). Returns the rep's name and email plus a found flag. Use this to identify who an email is being sent from."
-    user_id = (runtime.config.get("metadata") or {}).get("user_id")
-    record = data_service.get_rep(user_id or "")
-    if record is None:
-        return {"rep": None, "found": False}
-    return {"rep": record, "found": True}
-
-
-@tool
 def send_prospect_email(prospect: dict, subject: str, body: str, runtime: ToolRuntime, from_rep: dict | None = None) -> dict:
     "Send an email to an eligible prospect. Pass the prospect record, subject, and body; disqualified prospects are blocked. The sending rep defaults to the signed-in rep."
     prospect_id = prospect.get("prospect_id")
@@ -209,8 +199,6 @@ SYSTEM_PROMPT = (
     "offering fit criteria, update prospect info, and send emails to prospects. Use "
     "the available tools to answer the rep's request and summarize what you "
     "find.\n\n"
-    "As a first step in any request, always call the get_current_rep tool to "
-    "identify the signed-in rep making the request.\n\n"
     "Before sending an email, look up the prospect with get_prospect and check "
     "the authoritative record's disqualified flag. If disqualified, do not send; "
     "tell the rep the prospect is disqualified and the email was not sent. "
@@ -221,7 +209,7 @@ agent_model = ChatOpenAI(model=MODEL_NAME, temperature=0)
 
 gtm_agent = create_deep_agent(
     model=agent_model,
-    tools=[lookup_offering, build_prospect_profile, get_prospect, send_prospect_email, score_prospect, update_prospect_info, get_current_rep],
+    tools=[lookup_offering, build_prospect_profile, get_prospect, send_prospect_email, score_prospect, update_prospect_info],
     system_prompt=SYSTEM_PROMPT
 )
 
